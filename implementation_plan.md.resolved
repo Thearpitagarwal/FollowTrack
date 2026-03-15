@@ -1,0 +1,51 @@
+# FollowTrack v3 Implementation Plan
+
+The v3 refactoring transforms the app from a multi-role, multi-subject tracker into a single-teacher, single-subject immersive tool. The emphasis is on fluid "inward" navigation flows, embedded contexts (expandable cards, sliding panels) instead of deep page routing, and instant Firestore saves.
+
+## 1. Data Model & Architecture: Single Subject
+The core change driving v3 is ripping out the "Subject" dropdowns.
+- `user.subject` will become a single string rather than an array.
+- All Firestore queries in [attendance.js](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/lib/firestore/attendance.js) and [assignments.js](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/lib/firestore/assignments.js) that previously relied on UI state for `subject` will now implicitly or explicitly read `user.subject` from the active logged-in session.
+
+## 2. Dashboard: Inward Navigation Tiles
+- **Stat Cards**: Reduced to 3 cards.
+  - "Total Students" → Navigates to `/attendance`.
+  - "At Risk" (Critical/High counts) → Navigates to `/students?filter=critical,high`.
+  - "Due This Week" (count of assignments due <= 7 days) → Navigates to `/assignments`.
+- **Panels**: Replace the "Today's summary" panel with two dynamic lists:
+  - "Needs Attention": Top 5 at-risk students (clickable → expands them on My Students).
+  - "Upcoming": Assignments due in the next 14 days (clickable → opens side panel on Assignments).
+
+## 3. Immersive Student Cards ([MyStudents.jsx](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/pages/teacher/MyStudents.jsx))
+- **Filters**: Read `?filter=` on mount and activate Risk chips.
+- **Risk System**: Hardcode risk thresholds globally: `<50%` Critical, `50-64%` High, `65-74%` Medium, `>=75%` Low.
+- **List View**: A sleek summary row per student with integrated mini progress bars for Attendance (colored by risk) and Assignments (ink).
+- **Expandable Card**: Clicking a row opens an animated panel underneath reading from `getStudentWithStats`.
+  - Displays explicit counts of sessions (Present/Absent) and assignments (Submitted/Missing).
+  - Queries `followUpLog` subcollection for the 2 most recent interactions.
+  - Houses a "Follow-Up" button navigating to `/follow-up` with the student pre-selected.
+
+## 4. Redesigned Attendance Flow ([Attendance.jsx](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/pages/teacher/Attendance.jsx))
+- **Tabs**: "Mark Attendance" vs "History".
+- **Real-time Feedback**: Loading a sheet gives every student a row. Marking a status instantly updates their local "Overall %" and progress bar in memory before saving.
+- **Save Mechanics**: "Save Attendance" triggers a batched write to `attendance`, then iteratively runs [recomputeStudentAttendance](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/lib/firestore/students.js#25-62) for every modified student. Success toast on completion.
+
+## 5. Assignment Slide-in Panel ([Assignments.jsx](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/pages/teacher/Assignments.jsx))
+- **Cards**: List view now uses dynamic progress bars and date-badging (Red/Amber/Green based on proximity).
+- **Submission Side Panel**: Clicking "View Submissions" mounts a fixed side-panel over the content.
+- **Instant Save**: Checking "Submitted", "Missing", or "Late" instantly triggers an [updateSubmission](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/lib/firestore/assignments.js#75-103) Firestore write.
+- **Local Undo**: Saving the state on mount to allow "Revert" clicking.
+
+## 6. Firestore Helper Updates
+- Add `getStudentWithStats` to aggregate all relevant document counts for the expanded card in a single efficient call (using `Promise.all`).
+- Add `getAssignmentById`.
+
+---
+
+## User Review Required
+
+> [!CAUTION]
+> **Data Seed Implications**
+> Because we are moving `user.subjects` (Array) to `user.subject` (String), I will need to update [src/lib/seedFirestore.js](file:///c:/Users/arpit/OneDrive/Desktop/followtrack1/src/lib/seedFirestore.js) so fresh logins get seeded with the correct schema. You may need to press the "Seed Test Data" button on your dashboard again after the v3 refactor to ensure your database is compatible with the new schema.
+
+Are you ready to proceed with these sweeping v3 changes?

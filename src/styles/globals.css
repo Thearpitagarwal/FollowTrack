@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-coral:    #EF4623;
+  --color-ink:      #2D3B42;
+  --color-peach:    #FDF1EE;
+  --color-white:    #FFFFFF;
+  --color-coral-10: rgba(239, 70, 35, 0.10);
+  --color-coral-20: rgba(239, 70, 35, 0.20);
+  --color-ink-60:   rgba(45, 59, 66, 0.60);
+  --color-ink-10:   rgba(45, 59, 66, 0.10);
+
+  --font-display:   'Instrument Serif', serif;
+  --font-body:      'Manrope', sans-serif;
+
+  --text-hero:      clamp(60px, 8vw, 120px);
+  --text-h1:        48px;
+  --text-h2:        32px;
+  --text-h3:        22px;
+  --text-h4:        18px;
+  --text-body:      16px;
+  --text-small:     14px;
+  --text-label:     12px;
+  --tracking-tight: -0.03em;
+  --leading-relaxed: 1.65;
+
+  --radius-sm:      12px;
+  --radius-md:      20px;
+  --radius-lg:      28px;
+  --radius-xl:      36px;
+  --radius-pill:    999px;
+  --radius-btn:     30px;
+
+  --shadow-card:    0 4px 24px rgba(45, 59, 66, 0.08);
+  --shadow-btn:     0 8px 24px rgba(239, 70, 35, 0.20);
+  --shadow-modal:   0 24px 64px rgba(45, 59, 66, 0.18);
+  --shadow-sidebar: 4px 0 32px rgba(45, 59, 66, 0.06);
+
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body {
+  font-family: var(--font-body);
+  background:  #F8F9FA;
+  color:       var(--color-ink);
+  font-size:   16px;
+  line-height: var(--leading-relaxed, 1.65);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color:       var(--color-ink);
+  letter-spacing: -0.03em;
+  font-weight: normal;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px) rotate(2deg); }
+  to   { opacity: 1; transform: translateY(0)    rotate(0deg); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s var(--ease-out-expo) both;
+}
+
+.animate-fade-up-delay-1 { animation-delay: 0.08s; }
+.animate-fade-up-delay-2 { animation-delay: 0.16s; }
+.animate-fade-up-delay-3 { animation-delay: 0.24s; }
+
+.ambient-blob {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  background: var(--color-coral-10);
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
+}

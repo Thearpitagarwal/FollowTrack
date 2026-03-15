@@ -1,0 +1,100 @@
+import {
+  collection, doc, getDocs, getDoc, updateDoc,
+  query, where, orderBy, serverTimestamp, limit
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import { computeRiskLevel } from '../riskEngine';
+
+// Get all students in a section
+export async function getStudentsBySection(section) {
+  const q = query(
+    collection(db, 'students'),
+    where('section', '==', section),
+    orderBy('attendancePct', 'asc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// Get single student
+export async function getStudent(studentId) {
+  const snap = await getDoc(doc(db, 'students', studentId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Update overall attendancePct and riskLevel after marking attendance
+// Call this after every attendance save
+export async function recomputeStudentAttendance(studentId, section) {
+  // Fetch all attendance sessions for this section
+  const q = query(
+    collection(db, 'attendance'),
+    where('section', '==', section)
+  );
+  const sessions = await getDocs(q);
+
+  let totalSessions = 0;
+  let presentCount  = 0;
+
+  sessions.docs.forEach(s => {
+    const records = s.data().records;
+    if (records && records[studentId] !== undefined) {
+      totalSessions++;
+      if (records[studentId] === 'present' || records[studentId] === 'late') {
+        presentCount++;
+      }
+    }
+  });
+
+  const attendancePct = totalSessions === 0
+    ? 100
+    : Math.round((presentCount / totalSessions) * 100);
+
+  const riskLevel = computeRiskLevel(attendancePct);
+
+  await updateDoc(doc(db, 'students', studentId), {
+    attendancePct,
+    riskLevel,
+    updatedAt: serverTimestamp()
+  });
+
+  return { attendancePct, riskLevel };
+}
+
+// Get student with aggregated attendance and assignment stats (plus recent logs)
+export async function getStudentWithStats(studentId, section, subject) {
+  const { getAllSessionsBySection } = await import('./attendance');
+  const { getAssignmentsBySection } = await import('./assignments');
+
+  const [student, sessions, assignments, logsSnap] = await Promise.all([
+    getStudent(studentId),
+    getAllSessionsBySection(section),
+    getAssignmentsBySection(section),
+    getDocs(query(
+      collection(db, 'students', studentId, 'followUpLog'),
+      orderBy('date', 'desc'),
+      limit(2)
+    ))
+  ]);
+
+  // Attendance stats
+  const relevantSessions = sessions.filter(s => s.records?.[studentId] !== undefined);
+  const attendanceStats = {
+    total:   relevantSessions.length,
+    present: relevantSessions.filter(s => s.records[studentId] === 'present').length,
+    absent:  relevantSessions.filter(s => s.records[studentId] === 'absent').length,
+    late:    relevantSessions.filter(s => s.records[studentId] === 'late').length,
+  };
+
+  // Assignment stats
+  const assignmentStats = {
+    total:     assignments.length,
+    submitted: assignments.filter(a => a.submissions?.[studentId]?.status === 'submitted').length,
+    missing:   assignments.filter(a => a.submissions?.[studentId]?.status === 'missing').length,
+    late:      assignments.filter(a => a.submissions?.[studentId]?.status === 'late').length,
+  };
+
+  // Recent follow-up logs
+  const recentLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  return { student, attendanceStats, assignmentStats, recentLogs };
+}
