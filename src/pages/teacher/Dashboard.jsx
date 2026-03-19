@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { NavLink, Link } from 'react-router-dom';
 import { ROUTES } from '../../router/routes';
 import { RISK_COLORS } from '../../lib/riskEngine';
+import './teacher.css';
 
 export function Dashboard() {
   const { user } = useAuthStore();
@@ -33,7 +34,7 @@ export function Dashboard() {
         const studentsSnap = await getDocs(studentsQuery);
         const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const totalStudents = students.length;
+        const totalStudents = studentsSnap.size;
         const riskStudents = students.filter(s => ['critical', 'high'].includes(s.riskLevel));
         // Sort critical first, then high
         riskStudents.sort((a, b) => a.riskLevel === 'critical' ? -1 : 1);
@@ -130,36 +131,30 @@ export function Dashboard() {
       <h1 className="page-title">Dashboard</h1>
       
       {/* Stat Cards as Navigation Tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <Link to={ROUTES.ATTENDANCE} style={{ textDecoration: 'none', color: 'inherit' }}>
-          <Card hover={true} style={{ cursor: 'pointer', transition: 'all 0.2s', backgroundColor: '#ffffff' }}>
-            <CardContent style={{ padding: '1.5rem' }}>
-              <p style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: 'var(--color-ink)', opacity: 0.7 }}>Total Students</p>
-              <p style={{ fontFamily: 'var(--font-heading)', fontSize: '32px', color: 'var(--color-ink)' }}>{stats.totalStudents}</p>
-            </CardContent>
-          </Card>
+      <div className="stat-cards-grid">
+        <Link to={ROUTES.ATTENDANCE} className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <p className="label" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Total Students</p>
+            <p className="value" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.totalStudents}</p>
+          </div>
         </Link>
         
-        <Link to={`${ROUTES.MY_STUDENTS}?filter=critical,high`} style={{ textDecoration: 'none', color: 'inherit' }}>
-          <Card hover={true} style={{ cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--color-peach)' }}>
-            <CardContent style={{ padding: '1.5rem' }}>
-              <p style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: 'var(--color-ink)', opacity: 0.7 }}>At Risk</p>
-              <p style={{ fontFamily: 'var(--font-heading)', fontSize: '32px', color: 'var(--color-coral)' }}>{stats.atRisk}</p>
-            </CardContent>
-          </Card>
+        <Link to={`${ROUTES.MY_STUDENTS}?filter=critical,high`} className="stat-card" style={{ textDecoration: 'none', color: 'inherit', backgroundColor: 'var(--color-peach)' }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <p className="label" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>At Risk</p>
+            <p className="value" style={{ color: 'var(--color-coral)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.atRisk}</p>
+          </div>
         </Link>
         
-        <Link to={ROUTES.ASSIGNMENTS} style={{ textDecoration: 'none', color: 'inherit' }}>
-          <Card hover={true} style={{ cursor: 'pointer', transition: 'all 0.2s', backgroundColor: '#ffffff' }}>
-            <CardContent style={{ padding: '1.5rem' }}>
-              <p style={{ fontFamily: 'var(--font-body)', fontSize: '14px', color: 'var(--color-ink)', opacity: 0.7 }}>Due This Week</p>
-              <p style={{ fontFamily: 'var(--font-heading)', fontSize: '32px', color: 'var(--color-amber)' }}>{stats.assignmentsDue}</p>
-            </CardContent>
-          </Card>
+        <Link to={ROUTES.ASSIGNMENTS} className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <p className="label" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Due This Week</p>
+            <p className="value" style={{ color: 'var(--color-amber)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stats.assignmentsDue}</p>
+          </div>
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem' }}>
+      <div className="dashboard-bottom-grid">
         {/* At Risk List */}
         <Card className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
           <CardHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -177,12 +172,12 @@ export function Dashboard() {
                   <Link 
                     to={`/students?student=${student.id}`} 
                     key={student.id}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', border: '1px solid var(--color-ink-10)', borderRadius: 'var(--radius-md)', textDecoration: 'none', color: 'inherit' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', border: '1px solid var(--color-ink-10)', borderRadius: 'var(--radius-md)', textDecoration: 'none', color: 'inherit', gap: '1rem' }}
                   >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 600 }}>{student.name}</span>
-                        <Badge variant="outline" style={{ backgroundColor: RISK_COLORS[student.riskLevel].bg, color: RISK_COLORS[student.riskLevel].text, border: 'none' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                        <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0 }}>{student.name}</span>
+                        <Badge variant="outline" style={{ backgroundColor: RISK_COLORS[student.riskLevel].bg, color: RISK_COLORS[student.riskLevel].text, border: 'none', flexShrink: 0 }}>
                           {RISK_COLORS[student.riskLevel].label}
                         </Badge>
                       </div>
@@ -230,9 +225,9 @@ export function Dashboard() {
                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-coral)'; e.currentTarget.style.backgroundColor = 'var(--color-peach)'; }}
                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-ink-10)'; e.currentTarget.style.backgroundColor = '#ffffff'; }}
                    >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontWeight: 600, fontSize: '15px', paddingRight: '1rem' }}>{assignment.title}</span>
-                      <span style={{ fontSize: '12px', color: 'var(--color-amber)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flex: 1 }}>{assignment.title}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-amber)', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
                         Due {format(assignment.dueDate.toDate(), 'MMM d')}
                       </span>
                     </div>

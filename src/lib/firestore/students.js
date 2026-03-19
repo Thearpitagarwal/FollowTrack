@@ -13,7 +13,30 @@ export async function getStudentsBySection(section) {
     orderBy('attendancePct', 'asc')
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const seen = new Map();
+  raw.forEach(s => { 
+    // Prefer rollNumber for dedup if available, else id
+    // Clean string by converting to lowercase and stripping whitespace
+    const keyStr = (s.rollNumber || '').toString().trim().toLowerCase();
+    const key = keyStr ? keyStr : s.id;
+    
+    // If we haven't seen this key OR the existing one doesn't have a name but the new one does...
+    if (!seen.has(key) || (!seen.get(key).name && s.name)) {
+      seen.set(key, s);
+    } 
+  });
+  
+  const unique = Array.from(seen.values());
+  
+  // Sort alphabetically by name (A-Z), case-insensitive
+  unique.sort((a, b) => {
+    const nameA = (a.name || '').trim().toLowerCase();
+    const nameB = (b.name || '').trim().toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+  
+  return unique;
 }
 
 // Get single student
@@ -39,6 +62,7 @@ export async function recomputeStudentAttendance(studentId, section) {
     const records = s.data().records;
     if (records && records[studentId] !== undefined) {
       totalSessions++;
+      // Treat 'late' as 'present' (Late status removed from UI)
       if (records[studentId] === 'present' || records[studentId] === 'late') {
         presentCount++;
       }
@@ -69,11 +93,7 @@ export async function getStudentWithStats(studentId, section, subject) {
     getStudent(studentId),
     getAllSessionsBySection(section),
     getAssignmentsBySection(section),
-    getDocs(query(
-      collection(db, 'students', studentId, 'followUpLog'),
-      orderBy('date', 'desc'),
-      limit(2)
-    ))
+    getDocs(collection(db, 'students', studentId, 'followUpLog'))
   ]);
 
   // Attendance stats
@@ -94,7 +114,25 @@ export async function getStudentWithStats(studentId, section, subject) {
   };
 
   // Recent follow-up logs
-  const recentLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const allLogs = logsSnap.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id,
+      type: data.type,
+      date: data.date,
+      outcome: data.outcome,
+      notes: data.notes ?? null,
+    };
+  });
+  
+  // Sort descending manually to bypass Firestore index limitations
+  allLogs.sort((a, b) => {
+    const tA = a.date?.toMillis ? a.date.toMillis() : 0;
+    const tB = b.date?.toMillis ? b.date.toMillis() : 0;
+    return tB - tA; // Newest first
+  });
+  
+  const recentLogs = allLogs.slice(0, 2);
 
   return { student, attendanceStats, assignmentStats, recentLogs };
 }

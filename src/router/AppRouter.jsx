@@ -18,13 +18,19 @@ import { FollowUpLogger } from '../pages/teacher/FollowUpLogger';
 import { StudentProfile } from '../pages/shared/StudentProfile';
 import { SeedPage } from '../pages/admin/SeedPage';
 
+// TopBar (added for responsive shell)
+import { TopBar } from '../components/layout/TopBar';
+
 // Layout wrapper — renders Sidebar + content
 function AppLayout() {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--color-warm-white, #FAF8F5)' }}>
-        <Outlet />
+      <main className="main-content">
+        <TopBar />
+        <div className="page-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

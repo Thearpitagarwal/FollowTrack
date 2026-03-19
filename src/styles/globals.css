@@ -11,8 +11,13 @@
   --color-coral-20: rgba(239, 70, 35, 0.20);
   --color-ink-60:   rgba(45, 59, 66, 0.60);
   --color-ink-10:   rgba(45, 59, 66, 0.10);
+  --color-ink-20:   rgba(45, 59, 66, 0.20);
+  --color-ink-5:    rgba(45, 59, 66, 0.05);
+  --color-amber:    #D97706;
+  --color-bg:       #F8F9FA;
 
   --font-display:   'Instrument Serif', serif;
+  --font-heading:   'Instrument Serif', serif;
   --font-body:      'Manrope', sans-serif;
 
   --text-hero:      clamp(60px, 8vw, 120px);
@@ -33,10 +38,11 @@
   --radius-pill:    999px;
   --radius-btn:     30px;
 
-  --shadow-card:    0 4px 24px rgba(45, 59, 66, 0.08);
-  --shadow-btn:     0 8px 24px rgba(239, 70, 35, 0.20);
-  --shadow-modal:   0 24px 64px rgba(45, 59, 66, 0.18);
-  --shadow-sidebar: 4px 0 32px rgba(45, 59, 66, 0.06);
+  --shadow-card:       0 4px 24px rgba(45, 59, 66, 0.08);
+  --shadow-card-hover: 0 8px 32px rgba(45, 59, 66, 0.14);
+  --shadow-btn:        0 8px 24px rgba(239, 70, 35, 0.20);
+  --shadow-modal:      0 24px 64px rgba(45, 59, 66, 0.18);
+  --shadow-sidebar:    4px 0 32px rgba(45, 59, 66, 0.06);
 
   --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -62,6 +68,11 @@ h1, h2, h3, h4 {
   to   { opacity: 1; transform: translateY(0)    rotate(0deg); }
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0.5; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+
 .animate-fade-up {
   animation: fadeUp 0.5s var(--ease-out-expo) both;
 }
@@ -79,4 +90,111 @@ h1, h2, h3, h4 {
   filter: blur(100px);
   pointer-events: none;
   z-index: 0;
+}
+
+/* ─── Text Truncation ────────────────────────────────────────── */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Responsive Typography ──────────────────────────────────── */
+.page-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(24px, 4vw, 40px);
+  letter-spacing: -0.03em;
+}
+
+.section-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(18px, 3vw, 24px);
+  letter-spacing: -0.02em;
+}
+
+/* ─── Buttons — Always Minimum Touch Target ───────────────────── */
+button, a, [role="button"] {
+  min-height: 44px;              /* Apple/Google recommended minimum tap target */
+  min-width: 44px;
+}
+
+/* Exception: icon-only small buttons */
+.btn-icon-sm {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+/* ─── Form Inputs ────────────────────────────────────────────── */
+input, textarea, select {
+  width: 100%;
+  font-size: 16px;               /* Prevents iOS zoom on focus */
+  box-sizing: border-box;
+}
+
+/* ─── Prevent Text Overflow Everywhere ───────────────────────── */
+* {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Exception: code blocks and pre */
+pre, code {
+  word-break: normal;
+  overflow-x: auto;
+}
+
+/* ─── Safe Area Insets (for notched phones) ──────────────────── */
+.attendance-save-footer,
+.submission-panel-footer {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(45, 59, 66, 0.20); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(45, 59, 66, 0.35); }
+
+/* ─── Toast Notifications ────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: calc(100vw - 48px);  /* Never wider than viewport */
+}
+
+.toast {
+  background: white;
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 32px rgba(45, 59, 66, 0.16);
+  border-left: 4px solid #EF4623;
+  font-family: 'Manrope', sans-serif;
+  font-size: 14px;
+  max-width: 320px;
+  animation: slideInToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.toast.success { border-left-color: #16A34A; }
+.toast.error   { border-left-color: #EF4623; }
+
+@keyframes slideInToast {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@media (max-width: 767px) {
+  .toast-container {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: 100%;
+  }
+  .toast {
+    max-width: 100%;
+  }
 }

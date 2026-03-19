@@ -1,6 +1,7 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
 import { logoutUser } from '../../lib/auth';
 import { clsx } from 'clsx';
 import {
@@ -29,14 +30,23 @@ function getInitials(name) {
 
 export function Sidebar() {
   const { user } = useAuthStore();
+  const { sidebarOpen, closeSidebar } = useUIStore();
+  const location = useLocation();
+
+  useEffect(() => {
+    closeSidebar();
+  }, [location.pathname]);
   
   if (!user) return null;
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <h1 className="sidebar-logo">FollowTrack</h1>
-      </div>
+    <>
+      <div 
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        onClick={closeSidebar}
+      />
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header" style={{ height: '32px' }}></div>
 
       <nav className="sidebar-nav">
         {navItems.map((item) => {
@@ -45,7 +55,9 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) => clsx('nav-item', isActive && 'nav-item-active')}
+              className={({ isActive }) =>
+                `sidebar-nav-item ${isActive ? 'active' : ''}`
+              }
             >
               <Icon size={20} className="nav-icon" />
               <span>{item.label}</span>
@@ -55,17 +67,18 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="user-avatar">{getInitials(user.name)}</div>
-          <div className="user-info">
-            <p className="user-name">{user.name}</p>
+        <div className="sidebar-user">
+          <div className="sidebar-user-avatar">{getInitials(user.name)}</div>
+          <div className="sidebar-user-info">
+            <p className="sidebar-user-name">{user.name}</p>
           </div>
         </div>
-        <button onClick={() => logoutUser()} className="logout-btn">
-          <LogOut size={18} />
+        <button onClick={() => logoutUser()} className="sidebar-signout-btn">
+          <LogOut size={16} />
           <span>Sign Out</span>
         </button>
       </div>
     </aside>
+    </>
   );
 }

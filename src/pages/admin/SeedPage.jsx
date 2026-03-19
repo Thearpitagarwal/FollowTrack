@@ -40,8 +40,16 @@ export function SeedPage() {
         }
         addLog(`   ✓ Deleted ${asgSnap.size} assignments`);
 
+        addLog('🗑️ Step 4: Wiping ALL follow-ups...');
+        const fupSnap = await getDocs(collection(db, 'followups'));
+        addLog(`   Found ${fupSnap.size} follow-up documents`);
+        for (const d of fupSnap.docs) {
+          await deleteDoc(d.ref);
+        }
+        addLog(`   ✓ Deleted ${fupSnap.size} follow-ups`);
+
         // STEP 2: Create teacher user doc
-        addLog('👤 Step 4: Writing teacher user document...');
+        addLog('👤 Step 5: Writing teacher user document...');
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           name: 'Prof. Anil Verma',
@@ -53,7 +61,7 @@ export function SeedPage() {
         addLog('   ✓ Teacher doc written');
 
         // STEP 3: Create 40 students
-        addLog('📝 Step 5: Creating 40 students...');
+        addLog('📝 Step 6: Creating 40 students...');
         const firstNames = ['Aaditya','Aarav','Aditi','Ananya','Arjun','Aryan','Ayush','Bhavya','Chaitanya','Dev','Diya','Eshaan','Gauri','Hari','Isha','Jatin','Kavya','Krish','Lakshay','Meera','Neha','Nikhil','Om','Pari','Pranav','Rahul','Riya','Rohan','Roshni','Sahil','Samar','Sanya','Shaurya','Shiv','Shreya','Sneha','Tanvi','Tarun','Vedant','Vidya'];
         const lastNames = ['Sharma','Verma','Gupta','Singh','Patel','Yadav','Joshi','Agarwal','Choudhary','Kumar','Das','Shah','Mehta','Mishra','Pandey','Reddy','Nair','Bose','Rao','Iyer'];
         
@@ -84,7 +92,7 @@ export function SeedPage() {
         addLog(`   ✓ Created ${studentRefs.length} students`);
 
         // STEP 4: Create 2 attendance sessions
-        addLog('📋 Step 6: Creating attendance sessions...');
+        addLog('📋 Step 7: Creating attendance sessions...');
         const today = new Date();
         const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
         const twoDaysAgo = new Date(today); twoDaysAgo.setDate(today.getDate() - 2);
@@ -116,7 +124,7 @@ export function SeedPage() {
         addLog('   ✓ Created 2 attendance sessions');
 
         // STEP 5: Create 2 assignments
-        addLog('📚 Step 7: Creating assignments...');
+        addLog('📚 Step 8: Creating assignments...');
         const assignments = [
           { title: 'ER Diagram — Hospital Management System', dueDate: new Date(today.getTime() + 3*24*60*60*1000), maxMarks: 10 },
           { title: 'SQL Queries — Library Database', dueDate: new Date(today.getTime() - 2*24*60*60*1000), maxMarks: 10 }
@@ -154,8 +162,41 @@ export function SeedPage() {
         }
         addLog('   ✓ Created 2 assignments');
 
+        // STEP 6: Create dummy follow-ups for students with < 75% attendance
+        addLog('📞 Step 9: Creating follow-ups for at-risk students...');
+        const atRiskStudents = studentRefs.filter(s => {
+          const pct = 35 + ((studentRefs.indexOf(s) * 13) % 60);
+          return pct < 75;
+        });
+
+        const followUpMethods = ['Call', 'Email', 'WhatsApp'];
+        const followUpOutcomes = ['Reached Parent', 'No Response', 'Parent Aware', 'Student Promised Improvement'];
+        
+        let followUpsCreated = 0;
+        for (const s of atRiskStudents) {
+          // Give them 1 to 3 followups
+          const numFollowUps = 1 + (studentRefs.indexOf(s) % 3);
+          for (let j = 0; j < numFollowUps; j++) {
+            const fDate = new Date(today);
+            fDate.setDate(today.getDate() - (j * 2) - 1);
+            
+            await addDoc(collection(db, 'followups'), {
+              studentId: s.id,
+              teacherId: user.uid,
+              teacherName: 'Prof. Anil Verma',
+              method: followUpMethods[(studentRefs.indexOf(s) + j) % followUpMethods.length],
+              outcome: followUpOutcomes[(studentRefs.indexOf(s) + j) % followUpOutcomes.length],
+              notes: 'Discussed recent absences and remedial classes.',
+              date: fDate.toISOString(),
+              timestamp: serverTimestamp()
+            });
+            followUpsCreated++;
+          }
+        }
+        addLog(`   ✓ Created ${followUpsCreated} follow-ups`);
+
         addLog('');
-        addLog('✅ ALL DONE! 40 students, 2 sessions, 2 assignments.');
+        addLog('✅ ALL DONE! Seeded students, attendance, assignments, and follow-ups.');
         setDone(true);
       } catch(err) {
         addLog('❌ ERROR: ' + err.message);

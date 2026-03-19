@@ -93,10 +93,16 @@ export function StudentProfile() {
       
       setAssignments(asgs);
 
-      // 4. Follow Ups
-      const fuQ = query(collection(db, 'students', id, 'followUpLog'), orderBy('timestamp', 'desc'));
+      // 4. Follow Ups — read from top-level 'followups' collection (where FollowUpLogger saves)
+      const fuQ = query(collection(db, 'followups'), where('studentId', '==', id));
       const fuSnap = await getDocs(fuQ);
       const fus = fuSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort by date descending (newest first)
+      fus.sort((a, b) => {
+        const tA = a.date?.toMillis ? a.date.toMillis() : 0;
+        const tB = b.date?.toMillis ? b.date.toMillis() : 0;
+        return tB - tA;
+      });
       setFollowUps(fus);
 
     } catch (err) {
@@ -305,11 +311,20 @@ export function StudentProfile() {
                        <CardContent style={{ padding: '1.5rem' }}>
                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                            <span style={{ fontWeight: 600 }}>{fu.method}</span>
-                           <span style={{ fontSize: '13px', color: 'var(--color-ink)', opacity: 0.6 }}>{fu.date}</span>
+                           <span style={{ fontSize: '13px', color: 'var(--color-ink)', opacity: 0.6 }}>
+                             {fu.date?.toDate ? fu.date.toDate().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : fu.date || '—'}
+                           </span>
                          </div>
-                         <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--color-ink)', opacity: 0.8 }}>
-                           {fu.notes}
-                         </p>
+                         {fu.outcome && (
+                           <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)', opacity: 0.7, marginBottom: '0.5rem' }}>
+                             Outcome: <span style={{ fontWeight: 400 }}>{fu.outcome}</span>
+                           </p>
+                         )}
+                         {fu.notes && (
+                           <div style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--color-ink)', opacity: 0.8, backgroundColor: 'rgba(45,59,66,0.05)', padding: '0.75rem', borderRadius: '8px' }}>
+                             {fu.notes}
+                           </div>
+                         )}
                          <p style={{ fontSize: '12px', marginTop: '1rem', color: 'var(--color-ink)', opacity: 0.4 }}>
                            Logged by: {fu.teacherName}
                          </p>

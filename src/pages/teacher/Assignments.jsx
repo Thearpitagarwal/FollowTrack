@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { 
   getAssignmentsBySection, 
@@ -9,10 +9,12 @@ import {
 } from '../../lib/firestore/assignments';
 import { getStudentsBySection } from '../../lib/firestore/students';
 import { Card, CardContent } from '../../components/ui/Card';
+import { filterStudentsByName } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
-import { Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Search } from 'lucide-react';
+import './teacher.css';
 
 const STATUS_COLORS = {
   submitted: { active: '#16A34A' },
@@ -29,7 +31,7 @@ export function Assignments() {
   const [loading, setLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeAssignment, setActiveAssignment] = useState(null); // null means viewing list, else opens slide-in panel
+  const [activeAssignment, setActiveAssignment] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -43,7 +45,12 @@ export function Assignments() {
         getAssignmentsBySection(user.section),
         getStudentsBySection(user.section)
       ]);
-      setAssignments(fetchedAssig);
+      // Deduplicate assignments by id
+      const seenAssig = new Map();
+      fetchedAssig.forEach(a => { if (!seenAssig.has(a.id)) seenAssig.set(a.id, a); });
+
+      setAssignments(Array.from(seenAssig.values()));
+      // Students already deduplicated and sorted by getStudentsBySection
       setStudents(fetchedStudents.reduce((acc, s) => ({...acc, [s.id]: s}), {}));
     } catch (err) {
       console.error(err);
@@ -81,7 +88,7 @@ export function Assignments() {
           <p style={{ fontFamily: 'var(--font-heading)', fontStyle: 'italic', fontSize: '20px', color: 'var(--color-coral)' }}>No assignments found.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
+        <div className="assignments-list">
           {filteredAssignments.map((a, i) => (
             <AssignmentCard 
               key={a.id} 
@@ -100,24 +107,11 @@ export function Assignments() {
         <>
           {/* Backdrop */}
           <div 
-            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 40 }} 
+            className="submission-panel-overlay"
             onClick={() => { setActiveAssignment(null); loadData(); }}
           />
           {/* Panel */}
-          <div className="animate-fade-up" style={{ 
-            position: 'fixed', 
-            top: 0, 
-            right: 0, 
-            bottom: 0, 
-            width: '100%', 
-            maxWidth: '600px', 
-            backgroundColor: 'var(--color-bg)', 
-            boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
-            zIndex: 50,
-            animation: 'slideInRight 0.3s ease-out forwards',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
+          <div className="submission-panel">
             <SubmissionPanel 
               assignment={activeAssignment} 
               students={students} 
@@ -150,67 +144,59 @@ function AssignmentCard({ assignment, isActive, onView, onDelete, index }) {
   let dateBadgeBg = 'var(--color-ink-10)';
   let dateBadgeText = 'var(--color-ink)';
   if (diffDays < 0 && assignment.stats.missing > 0) {
-    // Overdue
-    dateBadgeBg = '#FEE2E2'; // Coral light
-    dateBadgeText = '#DC2626'; // Coral dark
+    dateBadgeBg = '#FEE2E2';
+    dateBadgeText = '#DC2626';
   } else if (diffDays <= 3 && diffDays >= 0) {
-    // Due Soon
-    dateBadgeBg = '#FEF3C7'; // Amber light
-    dateBadgeText = '#B45309'; // Amber dark
+    dateBadgeBg = '#FEF3C7';
+    dateBadgeText = '#B45309';
   } else if (assignment.stats.missing === 0 && assignment.stats.total > 0) {
-     // All Submitted
-     dateBadgeBg = '#DCFCE7'; // Green light
-     dateBadgeText = '#15803D'; // Green dark
+     dateBadgeBg = '#DCFCE7';
+     dateBadgeText = '#15803D';
   }
   
   return (
-    <Card className="animate-fade-up" style={{ 
+    <div className={`assignment-card animate-fade-up`} style={{ 
       animationDelay: `${index * 0.05}s`, 
-      display: 'flex', 
-      flexDirection: 'column',
-      border: isActive ? '2px solid var(--color-ink)' : '1px solid var(--color-ink-10)',
+      border: isActive ? '2px solid var(--color-ink)' : undefined,
       transform: isActive ? 'scale(1.02)' : 'none',
-      transition: 'all 0.2s',
-      boxShadow: isActive ? 'var(--shadow-card-hover)' : 'var(--shadow-card)'
+      boxShadow: isActive ? 'var(--shadow-card-hover)' : undefined
     }}>
-      <CardContent style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+      <div className="assignment-card-header">
+        <h3 className="assignment-card-title">{assignment.title}</h3>
+        <div className="assignment-card-actions">
           <Badge variant="outline" style={{ backgroundColor: dateBadgeBg, color: dateBadgeText, border: 'none', fontWeight: 600 }}>
             {diffDays < 0 ? 'Overdue' : diffDays === 0 ? 'Due Today' : `Due in ${diffDays} day${diffDays !== 1 ? 's': ''}`}
           </Badge>
-          <span style={{ fontSize: '13px', color: 'var(--color-ink)', opacity: 0.6 }}>
-            {formatDate(assignment.dueDate.toDate().toISOString())}
-          </span>
+          <button onClick={onDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink)', opacity: 0.5 }}>
+            <Trash2 size={20} />
+          </button>
         </div>
-        
-        <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', marginBottom: '0.25rem' }}>{assignment.title}</h3>
-        <p style={{ fontSize: '14px', color: 'var(--color-ink)', opacity: 0.7, marginBottom: '1.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {assignment.description || 'No description'}
-        </p>
+      </div>
+      
+      <p style={{ fontSize: '14px', color: 'var(--color-ink)', opacity: 0.7, marginBottom: '1.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {assignment.description || 'No description'}
+      </p>
 
-        <div style={{ marginTop: 'auto' }}>
-          <div style={{ width: '100%', backgroundColor: 'var(--color-ink-10)', height: '6px', borderRadius: 'var(--radius-pill)', marginBottom: '0.5rem', overflow: 'hidden' }}>
-            <div style={{ 
-              height: '100%', 
-              backgroundColor: 'var(--color-coral)', 
-              width: `${(assignment.stats.submitted + assignment.stats.late) / assignment.stats.total * 100 || 0}%` 
-            }} />
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', fontSize: '13px', color: 'var(--color-ink)', opacity: 0.7, marginBottom: '1.5rem' }}>
-            <span>Sub: {assignment.stats.submitted}</span>
-            <span>Miss: {assignment.stats.missing}</span>
-            <span>Late: {assignment.stats.late}</span>
-          </div>
+      <div style={{ width: '100%', backgroundColor: 'var(--color-ink-10)', height: '6px', borderRadius: 'var(--radius-pill)', marginBottom: '0.5rem', overflow: 'hidden' }}>
+        <div style={{ 
+          height: '100%', 
+          backgroundColor: 'var(--color-coral)', 
+          width: `${(assignment.stats.submitted + assignment.stats.late) / assignment.stats.total * 100 || 0}%` 
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: '1rem', fontSize: '13px', color: 'var(--color-ink)', opacity: 0.7, marginBottom: '1.5rem' }}>
+        <span>Sub: {assignment.stats.submitted}</span>
+        <span>Miss: {assignment.stats.missing}</span>
+        <span>Late: {assignment.stats.late}</span>
+      </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Button variant="outline" onClick={onView} style={{ flex: 1, marginRight: '1rem' }}>View Submissions</Button>
-            <button onClick={onDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink)', opacity: 0.5 }}>
-              <Trash2 size={20} />
-            </button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="assignment-card-footer">
+        <span style={{ fontSize: '13px', color: 'var(--color-ink)', opacity: 0.6 }}>
+          {formatDate(assignment.dueDate.toDate().toISOString())}
+        </span>
+        <Button className="view-submissions-btn" variant="outline" onClick={onView}>View Submissions</Button>
+      </div>
+    </div>
   );
 }
 
@@ -244,11 +230,16 @@ function CreateAssignmentModal({ onClose, onSuccess, user }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <Card style={{ width: '100%', maxWidth: '500px' }} className="animate-fade-up">
+    <div className="modal-backdrop">
+      <div className="modal-box">
         <form onSubmit={handleSubmit}>
-          <CardContent style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', marginBottom: '0.5rem' }}>New Assignment</h2>
+          <div className="modal-header">
+            <h2 className="modal-title">New Assignment</h2>
+            <button type="button" onClick={onClose} className="modal-close-btn">
+              <X size={20} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '0.25rem' }}>Title *</label>
@@ -282,74 +273,77 @@ function CreateAssignmentModal({ onClose, onSuccess, user }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+            <div className="modal-footer">
               <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
               <Button type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create'}</Button>
             </div>
-          </CardContent>
+          </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 }
 
 function SubmissionPanel({ assignment, students, onClose }) {
-  const [localSubmissions, setLocalSubmissions] = useState(assignment.submissions);
-  const [snapshotSubmissions, setSnapshotSubmissions] = useState(assignment.submissions); // For Revert functionality
+  const [localSubmissions, setLocalSubmissions] = useState(assignment.submissions || {});
+  const [snapshotSubmissions, setSnapshotSubmissions] = useState(assignment.submissions || {});
   const [savingRow, setSavingRow] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleUpdate = async (studentId, status, marks) => {
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Filtered students (always sorted alphabetically A-Z)
+  const studentRows = useMemo(() => {
+    let result = filterStudentsByName(Object.values(students), debouncedSearch);
+    result.sort((a,b) => (a.name||'').trim().toLowerCase().localeCompare((b.name||'').trim().toLowerCase()));
+    return result;
+  }, [students, debouncedSearch]);
+
+  const handleUpdate = React.useCallback(async (studentId, status, marks) => {
     setSavingRow(studentId);
+    setLocalSubmissions(prev => ({
+      ...prev,
+      [studentId]: { status, marks }
+    }));
     try {
       await updateSubmission(assignment.id, studentId, status, marks);
-      setLocalSubmissions(prev => ({
-        ...prev,
-        [studentId]: { status, marks, submittedAt: status === 'submitted' ? new Date() : null }
-      }));
-    } catch (err) {
-      console.error("Update failed", err);
-    }
-    setTimeout(() => setSavingRow(null), 1000);
-  };
-
-  const handleBulk = async (status) => {
-    const studentIds = Object.keys(students);
-    try {
-      await bulkUpdateSubmissions(assignment.id, studentIds, status);
-      const newSubs = { ...localSubmissions };
-      studentIds.forEach(id => {
-        newSubs[id] = { status, marks: newSubs[id]?.marks || null, submittedAt: status === 'submitted' ? new Date() : null };
-      });
-      setLocalSubmissions(newSubs);
     } catch (err) {
       console.error(err);
     }
-  };
+    setTimeout(() => {
+      setSavingRow(prev => prev === studentId ? null : prev);
+    }, 1000);
+  }, [assignment.id]);
 
-  // Convert map to array for rendering
-  const studentRows = Object.values(students);
   // Re-calculate stats based on local state for the summary row
-  const stats = {
-    total: studentRows.length,
-    submitted: Object.values(localSubmissions).filter(v => v.status === 'submitted').length,
-    missing: Object.values(localSubmissions).filter(v => v.status === 'missing').length,
-    late: Object.values(localSubmissions).filter(v => v.status === 'late').length,
-  };
+  const stats = useMemo(() => {
+    return {
+      total: Object.values(students).length,
+      submitted: Object.values(localSubmissions).filter(v => v.status === 'submitted').length,
+      missing: Object.values(localSubmissions).filter(v => v.status === 'missing').length,
+      late: Object.values(localSubmissions).filter(v => v.status === 'late').length,
+    };
+  }, [students, localSubmissions]);
   
-  let validMarks = 0; let totalMarks = 0;
-  Object.values(localSubmissions).forEach(v => {
-    if (v.marks !== null && v.marks !== undefined) {
-      validMarks++;
-      totalMarks += v.marks;
-    }
-  });
-  const avgMarks = validMarks > 0 ? (totalMarks / validMarks).toFixed(1) : '0';
+  const avgMarks = useMemo(() => {
+    let validMarks = 0; let totalMarks = 0;
+    Object.values(localSubmissions).forEach(v => {
+      if (v.marks !== null && v.marks !== undefined) {
+        validMarks++;
+        totalMarks += v.marks;
+      }
+    });
+    return validMarks > 0 ? (totalMarks / validMarks).toFixed(1) : '0';
+  }, [localSubmissions]);
 
   const handleRevert = () => {
     setLocalSubmissions(snapshotSubmissions);
-    // Since we write instantly, reverting means rewriting the old snapshot instantly
     const studentIds = Object.keys(snapshotSubmissions);
-    // Replay writes
     studentIds.forEach(id => {
        const o = snapshotSubmissions[id];
        if(o) updateSubmission(assignment.id, id, o.status, o.marks);
@@ -357,74 +351,132 @@ function SubmissionPanel({ assignment, students, onClose }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ padding: '2rem', borderBottom: '1px solid var(--color-ink-10)', backgroundColor: '#fff', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={onClose} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink)', opacity: 0.7, fontWeight: 600, padding: 0, marginBottom: '1.5rem' }}>
-          <ArrowLeft size={18} /> Close Panel
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', margin: 0 }}>{assignment.title}</h2>
+    <>
+      <div className="submission-panel-header">
+        <div style={{ flex: 1 }}>
+          <button onClick={onClose} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink)', opacity: 0.6, fontWeight: 600, padding: 0, marginBottom: '1rem', fontSize: '13px' }}>
+            <ArrowLeft size={16} /> Close Panel
+          </button>
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '22px', margin: '0 0 0.25rem 0', color: 'var(--color-ink)' }}>{assignment.title}</h2>
+          <p style={{ color: 'var(--color-ink)', opacity: 0.6, margin: '0 0 1rem 0', fontSize: '13px' }}>
+            Max Marks: {assignment.maxMarks} &nbsp;•&nbsp; Avg: {avgMarks} &nbsp;•&nbsp; {stats.total} students
+          </p>
+          
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-ink)', opacity: 0.4 }} />
+            <Input 
+              placeholder="Search by name or roll..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ paddingLeft: '36px', width: '100%', fontSize: '14px' }}
+            />
+          </div>
         </div>
-        <p style={{ color: 'var(--color-ink)', opacity: 0.7, margin: 0 }}>Max Marks: {assignment.maxMarks} • Avg: {avgMarks}</p>
       </div>
 
-      <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-ink-10)', backgroundColor: 'var(--color-peach)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '14px', fontWeight: 600 }}>
-          Sub: {stats.submitted} • Miss: {stats.missing} • Late: {stats.late}
+      <div className="submission-panel-body">
+        {studentRows.length === 0 ? (
+          <div style={{ padding: '4rem 1.5rem', textAlign: 'center' }}>
+            <p style={{ fontSize: '16px', color: 'var(--color-ink)', opacity: 0.5, fontStyle: 'italic', fontFamily: 'var(--font-heading)' }}>No submissions found.</p>
+          </div>
+        ) : (
+          <div>
+            {studentRows.map((st) => (
+              <StudentRow
+                key={st.id}
+                st={st}
+                sub={localSubmissions[st.id] || { status: 'missing', marks: null }}
+                isSaved={savingRow === st.id}
+                onUpdate={handleUpdate}
+                maxMarks={assignment.maxMarks}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="submission-panel-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', fontSize: '13px', fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16A34A', display: 'inline-block' }}></span>
+            Sub: {stats.submitted}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#EF4623', display: 'inline-block' }}></span>
+            Miss: {stats.missing}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#D97706', display: 'inline-block' }}></span>
+            Late: {stats.late}
+          </span>
+        </div>
+        <button onClick={handleRevert} style={{ fontSize: '13px', color: 'var(--color-amber)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>↻ Revert</button>
+      </div>
+    </>
+  );
+}
+
+const StudentRow = React.memo(({ st, sub, isSaved, onUpdate, maxMarks }) => {
+  const STATUS_LABELS = {
+    submitted: { label: 'Submitted', color: '#16A34A', bg: '#DCFCE7' },
+    missing:   { label: 'Missing',   color: '#EF4623', bg: '#FEE2E2' },
+    late:      { label: 'Late',      color: '#D97706', bg: '#FEF3C7' },
+  };
+
+  return (
+    <div className="submission-row">
+      <div className="submission-row-info">
+        <span style={{ fontWeight: '600', fontSize: '15px', color: 'var(--color-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'block' }}>
+          {st.name}
         </span>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={handleRevert} style={{ fontSize: '14px', color: 'var(--color-amber)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>↻ Revert</button>
-        </div>
+        <span style={{ fontSize: '13px', color: 'var(--color-ink)', opacity: 0.5, marginTop: '2px', display: 'block', fontFamily: 'monospace' }}>
+          {st.rollNumber}
+        </span>
       </div>
 
-      {/* List Body */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem' }}>
-            {studentRows.map(st => {
-              const sub = localSubmissions[st.id] || { status: 'missing', marks: null };
-              const isSaved = savingRow === st.id;
-              
-              return (
-                <div key={st.id} style={{ display: 'flex', alignItems: 'center', padding: '1rem', backgroundColor: '#fff', border: '1px solid var(--color-ink-10)', borderRadius: 'var(--radius-md)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px' }}>{st.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-ink)', opacity: 0.6 }}>{st.rollNumber}</div>
-                  </div>
+      <div className="submission-row-controls">
+        <div className="submission-status-btns">
+          {['submitted', 'missing', 'late'].map(status => {
+            const info = STATUS_LABELS[status];
+            const isActive = sub.status === status;
+            return (
+              <button
+                key={status}
+                className={`submission-status-btn ${status} ${isActive ? 'active' : ''}`}
+                onClick={() => onUpdate(st.id, status, status === 'missing' ? null : sub.marks)}
+                title={info.label}
+              >
+                {info.label.charAt(0)}
+              </button>
+            );
+          })}
+        </div>
 
-                  <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                     <div style={{ display: 'inline-flex', gap: '0.25rem', backgroundColor: 'var(--color-ink-10)', padding: '4px', borderRadius: 'var(--radius-pill)' }}>
-                        <button onClick={() => handleUpdate(st.id, 'submitted', sub.marks)} style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', cursor: 'pointer', fontWeight: 600, backgroundColor: sub.status === 'submitted' ? STATUS_COLORS.submitted.active : 'transparent', color: sub.status === 'submitted' ? '#fff' : 'var(--color-ink)', transition: 'all 0.2s', fontSize: '13px' }} title="Submitted">S</button>
-                        <button onClick={() => handleUpdate(st.id, 'missing', null)} style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', cursor: 'pointer', fontWeight: 600, backgroundColor: sub.status === 'missing' ? STATUS_COLORS.missing.active : 'transparent', color: sub.status === 'missing' ? '#fff' : 'var(--color-ink)', transition: 'all 0.2s', fontSize: '13px' }} title="Missing">M</button>
-                        <button onClick={() => handleUpdate(st.id, 'late', sub.marks)} style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', cursor: 'pointer', fontWeight: 600, backgroundColor: sub.status === 'late' ? STATUS_COLORS.late.active : 'transparent', color: sub.status === 'late' ? '#fff' : 'var(--color-ink)', transition: 'all 0.2s', fontSize: '13px' }} title="Late">L</button>
-                     </div>
-                     
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '80px', justifyContent: 'center' }}>
-                        {sub.status === 'missing' ? (
-                          <span style={{ color: 'var(--color-ink)', opacity: 0.3, fontSize: '20px' }}>—</span>
-                        ) : (
-                          <Input 
-                            type="number" 
-                            min="0" max={assignment.maxMarks} 
-                            value={sub.marks === null ? '' : sub.marks} 
-                            onChange={(e) => handleUpdate(st.id, sub.status, e.target.value === '' ? null : parseInt(e.target.value, 10))}
-                            style={{ padding: '0.4rem', height: 'auto', width: '60px', textAlign: 'center', fontWeight: '600' }}
-                          />
-                        )}
-                     </div>
-
-                     <div style={{ width: '20px', textAlign: 'center' }}>
-                       <span style={{ opacity: isSaved ? 1 : 0, color: '#16A34A', fontWeight: 700, transition: 'opacity 0.2s', fontSize: '16px' }}>✓</span>
-                     </div>
-                  </div>
-                </div>
-              );
-            })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {sub.status === 'missing' ? (
+            <span style={{ color: 'var(--color-ink)', opacity: 0.2, fontSize: '16px', width: '56px', textAlign: 'center' }}>—</span>
+          ) : (
+            <input 
+              type="number" 
+              className="marks-input"
+              min="0" max={maxMarks} 
+              value={sub.marks === null ? '' : sub.marks} 
+              onChange={(e) => {
+                const val = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                onUpdate(st.id, sub.status, val);
+              }}
+            />
+          )}
+          
+          <div style={{ width: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ opacity: isSaved ? 1 : 0, color: '#16A34A', fontWeight: 700, transition: 'opacity 0.3s', fontSize: '14px' }}>✓</span>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+});
+StudentRow.displayName = 'StudentRow';
 
 function formatDate(isoString) {
   if (!isoString) return '';

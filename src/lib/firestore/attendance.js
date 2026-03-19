@@ -62,13 +62,12 @@ export async function getSessionsByDateRange(section, startDate, endDate) {
 export async function saveAttendanceSession({
   teacherId, section, subject, date, records, students
 }) {
-  // Build summary
+  // Build summary (late treated as present)
   const values  = Object.values(records);
   const summary = {
     total:   students.length,
-    present: values.filter(v => v === 'present').length,
+    present: values.filter(v => v === 'present' || v === 'late').length,
     absent:  values.filter(v => v === 'absent').length,
-    late:    values.filter(v => v === 'late').length,
   };
 
   const dateTs = Timestamp.fromDate(new Date(date));
